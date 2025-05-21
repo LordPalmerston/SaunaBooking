@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Shared Sauna Booking</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+    .calendar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .slot { padding: 10px; border: 1px solid #ddd; text-align: center; cursor: pointer; }
+    .slot.available { background: #e6f7e6; }
+    .slot.booked { background: #ffdddd; opacity: 0.5; }
+    .slot.selected { background: #b3e6b3; }
+    .booking-form { margin-top: 20px; padding: 20px; border: 1px solid #ddd; }
+  </style>
+</head>
+<body>
+  <h1>Shared Sauna Booking</h1>
+  
+  <div>
+    <label for="booking-date">Select Date:</label>
+    <input type="date" id="booking-date" onchange="loadSlots()">
+  </div>
+  
+  <div id="calendar" class="calendar"></div>
+  
+  <div id="booking-form" class="booking-form" style="display: none;">
+    <h3>Book Your Session</h3>
+    <div>
+      <label>Start Time: <span id="selected-start"></span></label><br>
+      <label>End Time: <span id="selected-end"></span></label>
+    </div>
+    <div>
+      <label>Name: <input type="text" id="name" required></label><br>
+      <label>Email: <input type="email" id="email" required></label>
+    </div>
+    <button onclick="submitBooking()">Confirm Booking</button>
+    <p id="booking-message"></p>
+  </div>
+
+  <script>
+    let selectedSlot = null;
+    
+    // Load available slots when date changes
+    function loadSlots() {
+      const date = document.getElementById("booking-date").value;
+      if (!date) return;
+      
+      google.script.run.withSuccessHandler(updateCalendar)
+        .getAvailability(date);
+    }
+    
+    // Update calendar with available/booked slots
+    function updateCalendar(data) {
+      const calendar = document.getElementById("calendar");
+      calendar.innerHTML = "";
+      
+      data.slots.forEach(slotTime => {
+        const slot = document.createElement("div");
+        slot.className = "slot available";
+        
+        const date = new Date(slotTime);
+        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        slot.textContent = timeStr;
+        
+        slot.onclick = () => selectSlot(slotTime, data.isWeekend, data.maxDuration);
+        calendar.appendChild(slot);
+      });
+    }
+    
+    // Handle slot selection
+    function selectSlot(startTime, isWeekend, maxDuration) {
+      selectedSlot = {
+        startTime: new Date(startTime),
+        endTime: new Date(startTime + (30 * 60 * 1000)) // Default: 30min
+      };
+      
+      document.getElementById("selected-start").textContent = 
+        selectedSlot.startTime.toLocaleTimeString();
+      document.getElementById("selected-end").textContent = 
+        selectedSlot.endTime.toLocaleTimeString();
+      
+      document.getElementById("booking-form").style.display = "block";
+    }
+    
+    // Submit booking to Google Sheets
+    function submitBooking() {
+      const name = document.getElementById("name").value;
+      const email = document.getElementById("email").value;
+      
+      if (!name || !email) {
+        alert("Please fill in all fields!");
+        return;
+      }
+      
+      const bookingData = {
+        name: name,
+        email: email,
+        startTime: selectedSlot.startTime.toISOString(),
+        endTime: selectedSlot.endTime.toISOString()
+      };
+      
+      google.script.run.withSuccessHandler(showConfirmation)
+        .createBooking(bookingData);
+    }
+    
+    function showConfirmation(result) {
+      document.getElementById("booking-message").textContent = result.message;
+      setTimeout(() => location.reload(), 2000); // Refresh after 2 sec
+    }
+  </script>
+</body>
+</html>
