@@ -40,12 +40,28 @@
     let selectedSlot = null;
     
     // Load available slots when date changes
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzCQNsnbfNwd2_osAiWOkOauPIA_O-nJbpgRneCXm8pnULXin_vENGARRi_7QSWrgkoXg/exec";
+
     function loadSlots() {
       const date = document.getElementById("booking-date").value;
+      console.log("Selected date:", date); // Debug log
       if (!date) return;
       
-      fetch("https://script.google.com/macros/s/AKfycbzCQNsnbfNwd2_osAiWOkOauPIA_O-nJbpgRneCXm8pnULXin_vENGARRi_7QSWrgkoXg/exec?date=" + date).then(response => response.json()).then(data => updateCalendar(data));
+      fetch(`${APPS_SCRIPT_URL}?date=${date}`)
+        .then(response => {
+          if (!response.ok) throw new Error('Network error');
+          return response.json();
+        })
+        .then(data => {
+          console.log("Received data:", data); // Debug log
+          updateCalendar(data);
+        })
+        .catch(error => {
+          console.error('Fetch error:', error);
+          alert("Error loading availability. Please try again.");
+        });
     }
+
     
     // Update calendar with available/booked slots
     function updateCalendar(data) {
