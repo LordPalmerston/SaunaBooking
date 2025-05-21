@@ -44,7 +44,7 @@
       const date = document.getElementById("booking-date").value;
       if (!date) return;
       
-      fetch("YOUR_APPS_SCRIPT_WEB_APP_URL?date=" + date).then(response => response.json()).then(data => updateCalendar(data));
+      fetch("https://script.google.com/macros/s/AKfycbzCQNsnbfNwd2_osAiWOkOauPIA_O-nJbpgRneCXm8pnULXin_vENGARRi_7QSWrgkoXg/exec?date=" + date).then(response => response.json()).then(data => updateCalendar(data));
     }
     
     // Update calendar with available/booked slots
