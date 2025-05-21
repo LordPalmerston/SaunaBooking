@@ -44,8 +44,7 @@
       const date = document.getElementById("booking-date").value;
       if (!date) return;
       
-      google.script.run.withSuccessHandler(updateCalendar)
-        .getAvailability(date);
+      fetch("YOUR_APPS_SCRIPT_WEB_APP_URL?date=" + date).then(response => response.json()).then(data => updateCalendar(data));
     }
     
     // Update calendar with available/booked slots
