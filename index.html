@@ -4,18 +4,61 @@
   <title>Shared Sauna Booking</title>
   <style>
     body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-    .calendar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-    .slot { padding: 10px; border: 1px solid #ddd; text-align: center; cursor: pointer; }
+    .header { text-align: center; margin-bottom: 30px; }
+    .date-picker { margin: 20px 0; text-align: center; }
+    .calendar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 20px 0; }
+    .slot { 
+      padding: 10px; 
+      border: 1px solid #ddd; 
+      text-align: center; 
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
     .slot.available { background: #e6f7e6; }
-    .slot.booked { background: #ffdddd; opacity: 0.5; }
-    .slot.selected { background: #b3e6b3; }
-    .booking-form { margin-top: 20px; padding: 20px; border: 1px solid #ddd; }
+    .slot.booked { background: #ffdddd; opacity: 0.5; cursor: not-allowed; }
+    .slot.selected { background: #4CAF50; color: white; font-weight: bold; }
+    .slot:hover:not(.booked) { transform: scale(1.05); }
+    .booking-form { 
+      margin-top: 20px; 
+      padding: 20px; 
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background: #f9f9f9;
+    }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; margin-bottom: 5px; font-weight: bold; }
+    input { 
+      width: 100%; 
+      padding: 8px; 
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background 0.3s;
+    }
+    button:hover { background: #45a049; }
+    button:disabled { background: #cccccc; cursor: not-allowed; }
+    #booking-message { margin-top: 15px; padding: 10px; border-radius: 4px; }
+    .success { background: #dff0d8; color: #3c763d; }
+    .error { background: #f2dede; color: #a94442; }
   </style>
 </head>
 <body>
-  <h1>Shared Sauna Booking</h1>
+  <div class="header">
+    <h1>Shared Sauna Booking</h1>
+    <p>Book your sauna session in 30-minute increments (max 1.5h on weekends)</p>
+  </div>
   
-  <div>
+  <div class="date-picker">
     <label for="booking-date">Select Date:</label>
     <input type="date" id="booking-date" onchange="loadSlots()">
   </div>
@@ -24,28 +67,36 @@
   
   <div id="booking-form" class="booking-form" style="display: none;">
     <h3>Book Your Session</h3>
-    <div>
-      <label>Start Time: <span id="selected-start"></span></label><br>
-      <label>End Time: <span id="selected-end"></span></label>
+    <div class="form-group">
+      <label>Start Time: <span id="selected-start" class="time-display">Not selected</span></label>
     </div>
-    <div>
-      <label>Name: <input type="text" id="name" required></label><br>
-      <label>Email: <input type="email" id="email" required></label>
+    <div class="form-group">
+      <label>End Time: <span id="selected-end" class="time-display">Not selected</span></label>
     </div>
-    <button onclick="submitBooking()">Confirm Booking</button>
-    <p id="booking-message"></p>
+    <div class="form-group">
+      <label for="name">Name:</label>
+      <input type="text" id="name" required>
+    </div>
+    <div class="form-group">
+      <label for="email">Email:</label>
+      <input type="email" id="email" required>
+    </div>
+    <button id="confirm-btn" onclick="submitBooking()">Confirm Booking</button>
+    <div id="booking-message"></div>
   </div>
 
   <script>
-    let selectedSlot = null;
+    // Replace with your actual Apps Script Web App URL
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec";
+    let selectedSlots = [];
     
-    // Load available slots when date changes
-    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzCQNsnbfNwd2_osAiWOkOauPIA_O-nJbpgRneCXm8pnULXin_vENGARRi_7QSWrgkoXg/exec";
-
     function loadSlots() {
       const date = document.getElementById("booking-date").value;
-      console.log("Selected date:", date); // Debug log
       if (!date) return;
+      
+      document.getElementById("calendar").innerHTML = "Loading...";
+      selectedSlots = [];
+      document.getElementById("booking-form").style.display = "none";
       
       fetch(`${APPS_SCRIPT_URL}?date=${date}`)
         .then(response => {
@@ -53,17 +104,19 @@
           return response.json();
         })
         .then(data => {
-          console.log("Received data:", data); // Debug log
+          if (data.error) throw new Error(data.error);
           updateCalendar(data);
         })
         .catch(error => {
-          console.error('Fetch error:', error);
-          alert("Error loading availability. Please try again.");
+          document.getElementById("calendar").innerHTML = `
+            <div style="grid-column: 1/-1; color: red; text-align: center;">
+              Error: ${error.message}
+            </div>
+          `;
+          console.error("Error loading slots:", error);
         });
     }
-
     
-    // Update calendar with available/booked slots
     function updateCalendar(data) {
       const calendar = document.getElementById("calendar");
       calendar.innerHTML = "";
@@ -71,6 +124,7 @@
       data.slots.forEach(slotTime => {
         const slot = document.createElement("div");
         slot.className = "slot available";
+        slot.dataset.time = slotTime;
         
         const date = new Date(slotTime);
         const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -79,47 +133,119 @@
         slot.onclick = () => selectSlot(slotTime, data.isWeekend, data.maxDuration);
         calendar.appendChild(slot);
       });
+      
+      if (data.slots.length === 0) {
+        calendar.innerHTML = `
+          <div style="grid-column: 1/-1; text-align: center;">
+            No available time slots for this date
+          </div>
+        `;
+      }
     }
     
-    // Handle slot selection
-    function selectSlot(startTime, isWeekend, maxDuration) {
-      selectedSlot = {
-        startTime: new Date(startTime),
-        endTime: new Date(startTime + (30 * 60 * 1000)) // Default: 30min
-      };
+    function selectSlot(slotTime, isWeekend, maxDuration) {
+      const slotIndex = selectedSlots.findIndex(s => s.getTime() === slotTime);
       
-      document.getElementById("selected-start").textContent = 
-        selectedSlot.startTime.toLocaleTimeString();
-      document.getElementById("selected-end").textContent = 
-        selectedSlot.endTime.toLocaleTimeString();
+      if (slotIndex === -1) {
+        // Add slot to selection
+        selectedSlots.push(new Date(slotTime));
+      } else {
+        // Remove slot from selection
+        selectedSlots.splice(slotIndex, 1);
+      }
       
-      document.getElementById("booking-form").style.display = "block";
+      // Sort slots chronologically
+      selectedSlots.sort((a, b) => a - b);
+      
+      // Validate weekend duration
+      if (isWeekend && selectedSlots.length > 3) {
+        alert("Weekend bookings are limited to 1.5 hours (3 slots maximum)");
+        selectedSlots.pop();
+      }
+      
+      updateSelectionDisplay();
     }
     
-    // Submit booking to Google Sheets
-    function submitBooking() {
-      const name = document.getElementById("name").value;
-      const email = document.getElementById("email").value;
+    function updateSelectionDisplay() {
+      const bookingForm = document.getElementById("booking-form");
+      const startDisplay = document.getElementById("selected-start");
+      const endDisplay = document.getElementById("selected-end");
       
-      if (!name || !email) {
-        alert("Please fill in all fields!");
+      if (selectedSlots.length === 0) {
+        bookingForm.style.display = "none";
         return;
       }
       
+      const start = selectedSlots[0];
+      const end = new Date(selectedSlots[selectedSlots.length - 1].getTime() + 30*60000);
+      
+      startDisplay.textContent = start.toLocaleTimeString();
+      endDisplay.textContent = end.toLocaleTimeString();
+      bookingForm.style.display = "block";
+      
+      // Update visual selection
+      document.querySelectorAll('.slot').forEach(slot => {
+        const slotTime = parseInt(slot.dataset.time);
+        slot.classList.toggle('selected', 
+          selectedSlots.some(s => s.getTime() === slotTime));
+      });
+    }
+    
+    function submitBooking() {
+      if (selectedSlots.length === 0) {
+        showMessage("Please select at least one time slot!", "error");
+        return;
+      }
+
+      const name = document.getElementById("name").value.trim();
+      const email = document.getElementById("email").value.trim();
+
+      if (!name || !email) {
+        showMessage("Please fill in your name and email!", "error");
+        return;
+      }
+
+      const startTime = selectedSlots[0];
+      const endTime = new Date(selectedSlots[selectedSlots.length - 1].getTime() + 30*60000);
+
       const bookingData = {
         name: name,
         email: email,
-        startTime: selectedSlot.startTime.toISOString(),
-        endTime: selectedSlot.endTime.toISOString()
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        duration: selectedSlots.length * 30
       };
-      
-      google.script.run.withSuccessHandler(showConfirmation)
-        .createBooking(bookingData);
+
+      // Show loading state
+      const btn = document.getElementById("confirm-btn");
+      btn.disabled = true;
+      btn.textContent = "Processing...";
+
+      fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bookingData)
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          showMessage("Booking confirmed! Page will refresh shortly...", "success");
+          setTimeout(() => location.reload(), 2000);
+        } else {
+          throw new Error(data.message || "Booking failed");
+        }
+      })
+      .catch(error => {
+        showMessage("Error: " + error.message, "error");
+        btn.disabled = false;
+        btn.textContent = "Confirm Booking";
+      });
     }
     
-    function showConfirmation(result) {
-      document.getElementById("booking-message").textContent = result.message;
-      setTimeout(() => location.reload(), 2000); // Refresh after 2 sec
+    function showMessage(message, type) {
+      const messageDiv = document.getElementById("booking-message");
+      messageDiv.textContent = message;
+      messageDiv.className = type;
     }
   </script>
 </body>
